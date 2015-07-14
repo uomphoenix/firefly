@@ -24,3 +24,22 @@ and the multicopter itself.
 import logging
 import SocketServer
 import socket
+
+class Authenticator(object):
+    def __init__(self):
+        pass
+
+
+class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
+    def __init__(self, request, client_address):
+        
+        super(AuthenticationServerHandler, self).__init__(request, client_address)
+
+class AuthenticationServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+    def __init__(self, server_address, handler):
+
+        super(AuthenticationServer, self).__init__(server_address, handler)
+        
+
+class AuthenticationClient(object):
+    pass
