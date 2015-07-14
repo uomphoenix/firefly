@@ -13,6 +13,10 @@ some time.
 import logging
 import SocketServer
 
+from settings import receiver as recv_settings
+
+import cache
+
 class Handler(SocketServer.BaseRequestHandler):
     """
     A new handler instance is created for every frame sent by whatever our
@@ -50,7 +54,7 @@ class Handler(SocketServer.BaseRequestHandler):
 
             if uid is not None:
                 # store the frame in the cache
-                pass
+                self.server.cache_frame(uid, frame)
 
         except:
             logging.warn("An error occurred handling fragment from %s",
@@ -68,6 +72,8 @@ class Receiver(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
 
         self._authenticator = authenticator
 
+        self._caches = {}
+
         super(Receiver, self).__init__(server_address, handler)
 
     def authenticate(self, token):
@@ -82,11 +88,29 @@ class Receiver(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         uid = None
 
         try:
-            uid = self._authenticator.
+            uid = self._authenticator.auth(token)
         except:
             logging.exception("Error authenticating token '%s'", token)
         finally:
             return uid
+
+    def cache_frame(self, uid, frame):
+        """
+        Add the frame to the appropriate cache. The cache object will handle
+        the actual caching and maintaining the cache size, etc.
+
+        :param uid The UID of the transmitter who sent the frame
+        :param frame The raw frame data
+        """
+        cache = None
+        if uid not in self._caches:
+            cache = cache.FrameCache(recv_settings.cache_size)
+            self._caches[uid] = cache
+
+        else:
+            cache = self._caches[uid]
+
+        cache.add_frame(frame)
 
     def stop_server(self):
         """
