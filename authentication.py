@@ -55,21 +55,21 @@ class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
     Handles authentication attempts. Note that this is a TCP stream - the
     connection remains open until either end hangs up. The protocol is
     designed to be as light-weight as possible, requiring minimal
-    bandwidth.
+    bandwidth (i.e. byte optimized). 
 
     An authentication attempt is in the form:
-    A\0
+    \x01\x00
 
     A response is in the form:
-    A\0<challenge_token>\0
+    \x01\x00<challenge_token>\x00
 
     No additional parameters are required, and the source address must be
     whitelisted. TCP source is not spoofable like UDP sources (but can
     be manipulated in other malicious ways such as MITM attacks).
     """
     def __init__(self, request, client_address):
-
-        super(AuthenticationServerHandler, self).__init__(request, client_address)
+        super(AuthenticationServerHandler, self).__init__(request, 
+            client_address)
 
     def setup(self):
         pass
@@ -86,12 +86,12 @@ class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
 
         logging.debug("Received '%s' from '%s'", data, self.client_address[0])
 
-        if data[0:2] == "A\0":
+        if data[0:2] == "\x01\x00":
             # Authentication attempt. Since this address is whitelisted (as it
             # was successfully verified by the server in `verify_request`), we
             # can safely acknowledge the authentication.
 
-            self.request.send("A\0%s\0" % (
+            self.request.send("\x01\x00%s\x00" % (
                     self.server.authenticator.create_token(
                             self.client_address[0]
                         ),
@@ -102,16 +102,23 @@ class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
             logging.info("Unknown request '%s' from '%s'", 
                 data, self.client_address[0])
 
+            self.request.send("")
+
 
     def finish(self):
         # Close the connection once we've finished handling it
         self.request.close()
 
 class AuthenticationServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
-    def __init__(self, server_address, handler, authenticator):
-        self.authenticator = authenticator
+    def __init__(self, server_address, authenticator, 
+                 handler = AuthenticationServerHandler):
 
         super(AuthenticationServer, self).__init__(server_address, handler)
+
+        self.authenticator = authenticator
+
+        # Allow binding to the same address if the app didn't exit cleanly
+        self.allow_reuse_address = True
 
     def verify_request(self, request, client_address):
         chost, cport = client_address
