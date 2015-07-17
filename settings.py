@@ -1,14 +1,36 @@
+"""
+A settings file defined in python code, to make usage simpler than parsing
+a configuration file. A simple wrapper object is used over a base dictionary
+so we can access keys via attributes rather than dict indexing.
+"""
+
+class SettingsDict(dict):
+    def __getattr__(self, attr):
+        if attr in self:
+            return self[attr]
+        else:
+            return dict.get(self, attr)
+
+    def __setattr__(self, attr, value):
+        self[attr] = value
+
 # Authentication settings
-authentication = {
+authentication = SettingsDict({
     "host": "0.0.0.0",
     "port": 56789,
-}
+})
 
 # Receiver settings
-receiver = {
+receiver = SettingsDict({
     "cache_size": 10
-}
+})
 
 # Relay settings
+relay = SettingsDict({
+    "targets": [ ('1.1.1.1', 12345) ]
+})
 
-# Client settings
+# Observer settings
+observer = SettingsDict({
+    
+})
