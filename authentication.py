@@ -28,7 +28,7 @@ import socket
 from settings import authentication as auth_settings
 
 # Temporarily hardcode this
-CLIENT_WHITELIST = ['1.1.1.1']
+CLIENT_WHITELIST = ['192.168.101.1']
 
 class Authenticator(object):
     def __init__(self):
@@ -44,10 +44,24 @@ class Authenticator(object):
         :return A challenge token, new or existing
         """
         
-        pass
+        return "TEST"
 
-    def verify_token(self, token):
-        pass
+    def authenticate_token(self, token):
+        """
+        Authenticates a client's token. If the token exists in our cache, then 
+        we can simply return the matching UID. If no match is found, return
+        None.
+
+        :param token The token to authenticate
+
+        :return The UID matching the token, or None
+        """
+        
+        if token == "TEST":
+            return 1
+            
+        else:
+            return None
 
 
 class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
@@ -67,9 +81,9 @@ class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
     whitelisted. TCP source is not spoofable like UDP sources (but can
     be manipulated in other malicious ways such as MITM attacks).
     """
-    def __init__(self, request, client_address):
+    def __init__(self, request, client_address, server):
         SocketServer.BaseRequestHandler.__init__(self, request, 
-            client_address)
+            client_address, server)
 
     def setup(self):
         pass
