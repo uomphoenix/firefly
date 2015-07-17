@@ -9,3 +9,5 @@ the scene, as well as remotely for various personnel.
 """
 
 import socket
+
+from settings import relay as relay_settings
