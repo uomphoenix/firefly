@@ -15,7 +15,7 @@ import SocketServer
 
 from settings import receiver as recv_settings
 
-import cache
+import caching
 
 class ReceiverHandler(SocketServer.BaseRequestHandler):
     """
@@ -39,6 +39,8 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
         """
         try:
             data = self.request[0][:-1] # Strip trailing null byte
+
+            logging.debug("Received %s from %s", repr(data), self.client_address)
             delimited = data.split("\0")
 
             if len(delimited) != 2:
@@ -53,12 +55,16 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
             # token's UID
             uid = self.server.authenticate(challenge_token)
 
-            if uid is not None:
+            if uid is None:
+                logging.warn("Invalid challenge token given by %s", 
+                    self.client_address)
+
+            else:
                 # store the frame in the cache
                 self.server.cache_frame(uid, frame)
 
         except:
-            logging.warn("An error occurred handling fragment from %s",
+            logging.exception("An error occurred handling fragment from %s",
                 self.client_address)
 
     def finish(self):
@@ -95,7 +101,7 @@ class ReceiverServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         uid = None
 
         try:
-            uid = self.authenticator.verify_token(token)
+            uid = self.authenticator.authenticate_token(token)
 
         except:
             logging.exception("Error authenticating token '%s'", token)
@@ -113,7 +119,7 @@ class ReceiverServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         """
         cache = None
         if uid not in self._caches:
-            cache = cache.FrameCache(recv_settings.cache_size)
+            cache = caching.FrameCache(recv_settings.cache_size)
             self._caches[uid] = cache
 
         else:
