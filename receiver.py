@@ -17,7 +17,7 @@ from settings import receiver as recv_settings
 
 import cache
 
-class Handler(SocketServer.BaseRequestHandler):
+class ReceiverHandler(SocketServer.BaseRequestHandler):
     """
     A new handler instance is created for every frame sent by whatever our
     transmitter is. Each handler is run in its own thread. We need to
@@ -26,7 +26,7 @@ class Handler(SocketServer.BaseRequestHandler):
     a MIMO system).
     """
     def __init__(self, request, client_address, server):
-        super(Handler, self).__init__(request, client_address, server)
+        super(ReceiverHandler, self).__init__(request, client_address, server)
 
     def setup(self):
         pass
@@ -64,17 +64,21 @@ class Handler(SocketServer.BaseRequestHandler):
         pass
 
 
-class Receiver(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
-    def __init__(self, server_address, handler, authenticator):
+class ReceiverServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
+    def __init__(self, server_address, authenticator, 
+                 handler = ReceiverHandler):
         """
         Set up cache and others, run super init.
         """
+        super(ReceiverServer, self).__init__(server_address, handler)
 
         self.authenticator = authenticator
 
         self._caches = {}
 
-        super(Receiver, self).__init__(server_address, handler)
+
+        # Allow binding to the same address if the app didn't exit cleanly
+        self.allow_reuse_address = True
 
     def authenticate(self, token):
         """
