@@ -6,10 +6,7 @@ so we can access keys via attributes rather than dict indexing.
 
 class SettingsDict(dict):
     def __getattr__(self, attr):
-        if attr in self:
-            return self[attr]
-        else:
-            return dict.get(self, attr)
+        return dict.__getitem__(self, attr)
 
     def __setattr__(self, attr, value):
         self[attr] = value
@@ -22,6 +19,8 @@ authentication = SettingsDict({
 
 # Receiver settings
 receiver = SettingsDict({
+    "host": "0.0.0.0",
+    "port": 56790,
     "cache_size": 10
 })
 
