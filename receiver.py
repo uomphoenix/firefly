@@ -70,7 +70,7 @@ class Receiver(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         Set up cache and others, run super init.
         """
 
-        self._authenticator = authenticator
+        self.authenticator = authenticator
 
         self._caches = {}
 
@@ -88,9 +88,11 @@ class Receiver(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         uid = None
 
         try:
-            uid = self._authenticator.auth(token)
+            uid = self.authenticator.verify_token(token)
+
         except:
             logging.exception("Error authenticating token '%s'", token)
+
         finally:
             return uid
 
