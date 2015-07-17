@@ -26,7 +26,8 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
     a MIMO system).
     """
     def __init__(self, request, client_address, server):
-        super(ReceiverHandler, self).__init__(request, client_address, server)
+        SocketServer.BaseRequestHandler.__init__(self, request, 
+            client_address, server)
 
     def setup(self):
         pass
@@ -70,7 +71,7 @@ class ReceiverServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         """
         Set up cache and others, run super init.
         """
-        super(ReceiverServer, self).__init__(server_address, handler)
+        SocketServer.UDPServer.__init__(self, server_address, handler)
 
         self.authenticator = authenticator
 
@@ -79,6 +80,8 @@ class ReceiverServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
 
         # Allow binding to the same address if the app didn't exit cleanly
         self.allow_reuse_address = True
+        # Ensure request threads are terminated when the application exits
+        self.daemon_threads = True
 
     def authenticate(self, token):
         """

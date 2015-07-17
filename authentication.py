@@ -68,7 +68,7 @@ class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
     be manipulated in other malicious ways such as MITM attacks).
     """
     def __init__(self, request, client_address):
-        super(AuthenticationServerHandler, self).__init__(request, 
+        SocketServer.BaseRequestHandler.__init__(self, request, 
             client_address)
 
     def setup(self):
@@ -113,12 +113,14 @@ class AuthenticationServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     def __init__(self, server_address, authenticator, 
                  handler = AuthenticationServerHandler):
 
-        super(AuthenticationServer, self).__init__(server_address, handler)
+        SocketServer.TCPServer.__init__(self, server_address, handler)
 
         self.authenticator = authenticator
 
         # Allow binding to the same address if the app didn't exit cleanly
         self.allow_reuse_address = True
+        # Ensure request threads are terminated when the application exits
+        self.daemon_threads = True
 
     def verify_request(self, request, client_address):
         chost, cport = client_address
