@@ -24,7 +24,7 @@ class FrameCache(object):
         with self.lock:
             to_cache = (frame, time.time())
 
-            self._cache.add(to_cache)
+            self._cache.append(to_cache)
 
             # If the length of the cache is bigger than the allowed size, pop
             # the first item
@@ -32,4 +32,5 @@ class FrameCache(object):
                 self._cache.popleft()
 
     def __len__(self):
-        return len(self.cache)
+        with self.lock:
+            return len(self._cache)
