@@ -34,17 +34,6 @@ if __name__ == "__main__":
     logging.info("Initializing Firefly daemon")
     authenticator = authentication.Authenticator()
 
-    auth_server_address = (
-        settings.authentication["host"], 
-        settings.authentication.port
-    )
-
-    auth_server = authentication.AuthenticationServer(auth_server_address, 
-        authenticator)
-    
-    logging.info("Authentication server listening on %s:%s" % \
-        auth_server.server_address)
-
     receiver_server_address = (
         settings.receiver.host,
         settings.receiver.port
@@ -55,6 +44,17 @@ if __name__ == "__main__":
 
     logging.info("Receiver server listening on %s:%s" % \
         receiver_server.server_address)
+
+    auth_server_address = (
+        settings.authentication["host"], 
+        settings.authentication.port
+    )
+
+    auth_server = authentication.AuthenticationServer(auth_server_address, 
+        authenticator, receiver_server.server_address)
+    
+    logging.info("Authentication server listening on %s:%s" % \
+        auth_server.server_address)
 
     recv_thread = threading.Thread(target = receiver_server.serve_forever)
     recv_thread.daemon = True
