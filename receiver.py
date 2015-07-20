@@ -53,7 +53,7 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
 
             # Need to verify the challenge token and store the frame under the
             # token's UID
-            uid = self.server.authenticate(challenge_token)
+            uuid = self.server.authenticate(challenge_token)
 
             if uid is None:
                 logging.warn("Invalid challenge token given by %s", 
@@ -61,7 +61,7 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
 
             else:
                 # store the frame in the cache
-                self.server.cache_frame(uid, frame)
+                self.server.cache_frame(uuid, frame)
 
         except:
             logging.exception("An error occurred handling fragment from %s",
@@ -95,35 +95,35 @@ class ReceiverServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
 
         :param token The token to verify
 
-        :return The UID the token belongs to, or None if the toke cannot be
+        :return The UUID the token belongs to, or None if the toke cannot be
                 verified
         """
-        uid = None
+        uuid = None
 
         try:
-            uid = self.authenticator.authenticate_token(token)
+            uuid = self.authenticator.authenticate_token(token)
 
         except:
             logging.exception("Error authenticating token '%s'", token)
 
         finally:
-            return uid
+            return uuid
 
-    def cache_frame(self, uid, frame):
+    def cache_frame(self, uuid, frame):
         """
         Add the frame to the appropriate cache. The cache object will handle
         the actual caching and maintaining the cache size, etc.
 
-        :param uid The UID of the transmitter who sent the frame
+        :param uuid The UUID of the transmitter who sent the frame
         :param frame The raw frame data
         """
         cache = None
-        if uid not in self._caches:
+        if uuid not in self._caches:
             cache = caching.FrameCache(recv_settings.cache_size)
-            self._caches[uid] = cache
+            self._caches[uuid] = cache
 
         else:
-            cache = self._caches[uid]
+            cache = self._caches[uuid]
 
         cache.add_frame(frame)
 
