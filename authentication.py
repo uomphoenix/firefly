@@ -233,9 +233,50 @@ class AuthenticationServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
 
         return allowed
 
-class SimpleClient(object):
+class SimpleAuthenticationClient(object):
     """
     A basic implementation of a client which authenticates with the server and
     stores the retrieved token and receiver address.
     """
-    pass
+    def __init__(self, server_address):
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        self.server_address = server_address
+
+        self.authenticated = False
+        self.connected = False
+
+        self.token = None
+        self.receiver_address = None
+
+    def authenticate(self):
+        if self.authenticated:
+            return
+
+        self._connect()
+
+        # Send auth code
+        self.socket.send("\x01\x00")
+
+        # Wait for response
+        resp = self.socket.recv(128)
+
+        # print repr(resp)
+        resp = resp.split("\x00")
+
+        if len(resp) > 0:
+            token, r_host, r_port = resp[1:4]
+
+            self.token = token
+            self.receiver_address = (r_host, int(r_port))
+
+            print "Succesfully authenticated! Token: %s, recv address: %s" % (
+                token, self.receiver_address)
+
+            self.authenticated = True
+
+    def _connect(self):
+        if not self.connected:
+            self.socket.connect(self.server_address)
+
+            self.connected = True
