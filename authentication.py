@@ -24,15 +24,55 @@ and the multicopter itself.
 import logging
 import SocketServer
 import socket
+import time
+import uuid
+import threading
+import random
+import string
 
 from settings import authentication as auth_settings
 
 # Temporarily hardcode this
 CLIENT_WHITELIST = ['192.168.101.1']
 
+def rand_token(length, chars = string.digits):
+    """
+    At the moment, the token is only digits. This is to conserve bandwidth. It
+    should also be rather short (i.e. no more than 12 or so digits)
+    """
+    return "".join(random.SystemRandom().choice(chars) for _ in range(length))
+
+class NoClientFoundError(Exception):
+    """ Raised when we cannot find a client matching a given host/token """
+    pass
+
+class InvalidAuthenticationTokenError(Exception):
+    """ Raised when unable to authenticate a token """
+    pass
+
+class AuthenticatedClient(object):
+    """
+    A simple data object which retains information for a client who has
+    authenticated.
+    """
+    def __init__(self, host, token = None):
+        self.host = host
+        self.time_created = time.time()
+
+        self.uuid = uuid.uuid4()
+        
+        if token is None:
+            self.token = rand_token(8)
+        else:
+            self.token = token
+
+        self.last_frame_update = self.time_created
+
 class Authenticator(object):
     def __init__(self):
-        pass
+        self.clients = []
+
+        self.lock = threading.Lock()
 
     def create_token(self, host):
         """
@@ -43,39 +83,83 @@ class Authenticator(object):
 
         :return A challenge token, new or existing
         """
+        # Try get an existing client first. If the client does not exist, we
+        # create a new instance for it.
+        client = None
+
+        try:
+            client = self.get_client_by_host(host)
+
+            logging.debug("Found client matching host '%s', uuid: '%s'",
+                host, client.uuid)
+
+        except NoClientFoundError:
+            logging.debug("No client matching host '%s', creating a new one", 
+                host)
+
+            client = AuthenticatedClient(host)
+
+            with self.lock:
+                self.clients.append(client)
+
+        except:
+            logging.exception("Unknown exception obtaining client object")
         
-        return "TEST"
+        finally:
+            logging.debug("Created token for '%s'. uuid: %s, token: %s", 
+                host, client.uuid, client.token)
+            return client.token
 
     def authenticate_token(self, token):
         """
         Authenticates a client's token. If the token exists in our cache, then 
-        we can simply return the matching UID. If no match is found, return
-        None.
+        we can simply return the matching UID. If no match is found, raise
+        an exception.
 
         :param token The token to authenticate
 
-        :return The UID matching the token, or None
+        :return The UUID matching the token
+
+        :raises InvalidAuthenticationTokenError When the token is invalid
         """
         
-        if token == "TEST":
-            return 1
-            
-        else:
-            return None
+        try:
+            client = self.get_client_by_token(token)
 
+            return client.uuid
 
+        except NoClientFoundError:
+            raise InvalidAuthenticationTokenError("")
+
+    def get_client_by_host(self, host):
+        with self.lock:
+            for c in self.clients:
+                if c.host == host:
+                    return c
+
+            raise NoClientFoundError(
+                    "No client found matching host '%s'" % host
+                )
+
+    def get_client_by_token(self, token):
+        with self.lock:
+            for c in self.clients:
+                if c.token == token:
+                    return c
+
+            raise NoClientFoundError(
+                    "No client found matching token '%s'" % token
+                )
 class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
     """
     Handles authentication attempts. Note that this is a TCP stream - the
-    connection remains open until either end hangs up. The protocol is
-    designed to be as light-weight as possible, requiring minimal
-    bandwidth (i.e. byte optimized). 
+    connection remains open until either end hangs up. 
 
     An authentication attempt is in the form:
     \x01\x00
 
     A response is in the form:
-    \x01\x00<challenge_token>\x00
+    \x01\x00<challenge_token>\x00<receiver ip>\x00<receiver port>\x00
 
     No additional parameters are required, and the source address must be
     whitelisted. TCP source is not spoofable like UDP sources (but can
@@ -105,10 +189,12 @@ class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
             # was successfully verified by the server in `verify_request`), we
             # can safely acknowledge the authentication.
 
-            self.request.send("\x01\x00%s\x00" % (
-                    self.server.authenticator.create_token(
-                            self.client_address[0]
-                        ),
+            self.request.send("\x01\x00%s\x00%s\x00%s\x00" % (
+                        self.server.authenticator.create_token(
+                                self.client_address[0]
+                            ),
+                        self.server.receiver_address[0],
+                        self.server.receiver_address[1]
                     )
                 )
 
@@ -124,17 +210,18 @@ class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
         self.request.close()
 
 class AuthenticationServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
-    def __init__(self, server_address, authenticator, 
+    def __init__(self, server_address, authenticator,
+                 receiver_address,
                  handler = AuthenticationServerHandler):
-
-        SocketServer.TCPServer.__init__(self, server_address, handler)
-
-        self.authenticator = authenticator
-
         # Allow binding to the same address if the app didn't exit cleanly
         self.allow_reuse_address = True
         # Ensure request threads are terminated when the application exits
         self.daemon_threads = True
+
+        SocketServer.TCPServer.__init__(self, server_address, handler)
+
+        self.authenticator = authenticator
+        self.receiver_address = receiver_address
 
     def verify_request(self, request, client_address):
         chost, cport = client_address
@@ -146,5 +233,9 @@ class AuthenticationServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
 
         return allowed
 
-class AuthenticationClient(object):
+class SimpleClient(object):
+    """
+    A basic implementation of a client which authenticates with the server and
+    stores the retrieved token and receiver address.
+    """
     pass
