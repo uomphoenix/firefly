@@ -77,17 +77,17 @@ class ReceiverServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         """
         Set up cache and others, run super init.
         """
-        SocketServer.UDPServer.__init__(self, server_address, handler)
-
-        self.authenticator = authenticator
-
-        self._caches = {}
-
 
         # Allow binding to the same address if the app didn't exit cleanly
         self.allow_reuse_address = True
         # Ensure request threads are terminated when the application exits
         self.daemon_threads = True
+
+        SocketServer.UDPServer.__init__(self, server_address, handler)
+
+        self.authenticator = authenticator
+
+        self._caches = {}
 
     def authenticate(self, token):
         """
