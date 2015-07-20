@@ -55,7 +55,7 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
             # token's UID
             uuid = self.server.authenticate(challenge_token)
 
-            if uid is None:
+            if uuid is None:
                 logging.warn("Invalid challenge token given by %s", 
                     self.client_address)
 
