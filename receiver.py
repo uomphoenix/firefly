@@ -35,13 +35,13 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
     def handle(self):
         """
         Handles the UDP packet. Data is sent in the format:
-        challenge\0frame\0, where \0 is a null byte (0) acting as the delimiter
+        challenge\x00frame\x00, where \x00 is a null byte acting as the delimiter
         """
         try:
             data = self.request[0][:-1] # Strip trailing null byte
 
             logging.debug("Received %s from %s", repr(data), self.client_address)
-            delimited = data.split("\0")
+            delimited = data.split("\x00")
 
             if len(delimited) != 2:
                 logging.warn("Invalid fragment received from %s", 
@@ -72,7 +72,7 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
 
 
 class ReceiverServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
-    def __init__(self, server_address, authenticator, 
+    def __init__(self, server_address, authenticator, feed_cache,
                  handler = ReceiverHandler):
         """
         Set up cache and others, run super init.
@@ -86,8 +86,8 @@ class ReceiverServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         SocketServer.UDPServer.__init__(self, server_address, handler)
 
         self.authenticator = authenticator
-
-        self._caches = {}
+        self.feed_cache = feed_cache
+        
 
     def authenticate(self, token):
         """
@@ -117,15 +117,11 @@ class ReceiverServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         :param uuid The UUID of the transmitter who sent the frame
         :param frame The raw frame data
         """
-        cache = None
-        if uuid not in self._caches:
-            cache = caching.FrameCache(recv_settings.cache_size)
-            self._caches[uuid] = cache
-
-        else:
-            cache = self._caches[uuid]
-
-        cache.add_frame(frame)
+        try:
+            self.feed_cache.cache_frame(uuid, frame)
+            
+        except:
+            logging.exception("Exception caching frame for %s", uuid)
 
     def stop_server(self):
         """
