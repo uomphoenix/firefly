@@ -150,6 +150,8 @@ class Authenticator(object):
             raise NoClientFoundError(
                     "No client found matching token '%s'" % token
                 )
+
+
 class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
     """
     Handles authentication attempts. Note that this is a TCP stream - the
