@@ -13,13 +13,13 @@ class SettingsDict(dict):
 
 # Authentication settings
 authentication = SettingsDict({
-    "host": "0.0.0.0",
+    "host": "192.168.101.129",
     "port": 56789,
 })
 
 # Receiver settings
 receiver = SettingsDict({
-    "host": "0.0.0.0",
+    "host": "192.168.101.129",
     "port": 56790,
     "cache_size": 10
 })
@@ -31,5 +31,6 @@ relay = SettingsDict({
 
 # Observer settings
 observer = SettingsDict({
-    
+    "host": "192.168.101.129",
+    "port": 12345
 })
