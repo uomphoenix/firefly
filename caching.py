@@ -9,6 +9,42 @@ import collections
 import time
 import threading
 
+class FeedCache(object):
+    """
+    The feed cache holds a FrameCache object for every feed being served
+    by the daemon. This is necessary for us to share the cache between
+    multiple providers (i.e. between the observer, relay and receiver
+    servers).
+    """
+    def __init__(self, max_cache_size):
+        self.max_cache_size = max_cache_size
+
+        self.caches = {}
+
+        self.lock = threading.RLock()
+
+    def cache_frame(self, uuid, frame):
+        """
+        Add the frame to the appropriate cache. The cache object will handle
+        the actual caching and maintaining the cache size, etc.
+
+        :param uuid The UUID of the transmitter who sent the frame
+        :param frame The raw frame data
+        """
+        cache = None
+
+        # We need to lock this so multiple caches cannot be created/overriden
+        # for the same UUID by multiple threads
+        with self.lock:
+            if uuid not in self.caches:
+                cache = FrameCache(self.max_cache_size)
+                self.caches[uuid] = cache
+
+            else:
+                cache = self.caches[uuid]
+
+        cache.add_frame(frame)
+
 class FrameCache(object):
     """
     The cache will be accessed from multiple threads, therefore we need to
