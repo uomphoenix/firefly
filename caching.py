@@ -67,6 +67,24 @@ class FrameCache(object):
             if len(self) > self.size:
                 self._cache.popleft()
 
+    def get_frame(self, time_cutoff):
+        """
+        Gets the most recent frame after the specified cutoff. We don't just
+        get the most recent frame from the cache as that may not be the frame
+        that the client requires. Therefore we use the timestamp.
+        """
+        with self.lock:
+            to_send = None
+
+            for f, ts in self._cache:
+                if ts > time_cutoff:
+                    # Reached first frame which has a more recent timestamp.
+                    # This is the frame that we want to send
+                    to_send = f
+                    break
+
+            return to_send
+
     def __len__(self):
         with self.lock:
             return len(self._cache)
