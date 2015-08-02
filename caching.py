@@ -70,6 +70,8 @@ class FeedCache(object):
 
         raise NoCacheFoundError("No cache found matching ID %s" % cache_id)
 
+INITIAL_FRAMERATE = 15
+
 class FrameCache(object):
     """
     The cache will be accessed from multiple threads, therefore we need to
@@ -79,20 +81,24 @@ class FrameCache(object):
         self.client = client
 
         self.size = size
-        self._cache = collections.deque()
+        self._cache = collections.deque(maxlen = size)
 
         self.lock = threading.RLock()
 
+        self._last_framerate_guess = INITIAL_FRAMERATE
+
     def add_frame(self, frame):
         with self.lock:
-            to_cache = (frame, time.time())
+            ctime = time.time()
 
+            to_cache = (frame, ctime)
+
+            # The deque will automatially remove items from the left side of
+            # the cache since we specified a maxlen (if we were appending to
+            # the left side, it'd remove from the right side)
             self._cache.append(to_cache)
 
-            # If the length of the cache is bigger than the allowed size, pop
-            # the first item
-            if len(self) > self.size:
-                self._cache.popleft()
+            self.client.last_frame_update = ctime
 
     def get_frame(self, time_cutoff):
         """
@@ -111,6 +117,41 @@ class FrameCache(object):
                     break
 
             return to_send
+
+    def is_stream_timed_out(self):
+        """
+        A stream is considered timed out if there has been more than 60 seconds
+        since the last frame was received
+        """
+        return time.time() - self.client.last_frame_update > 60
+
+    def get_framerate(self):
+        """
+        The framerate is approximately the number of frames in cache/time 
+        between first and last frame received in the cache. We go a bit
+        more in-depth and use a moving average every time this method is
+        invoked.
+        """
+        cache_len = len(self)
+
+        if cache_len == 0:
+            return self._last_framerate_guess
+
+        time_diff = self._cache[:-1][1] - self._cache[0][1]
+
+        guess = cache_len / (time_diff if time_diff > 0 else 1)
+
+        new_guess = (self._last_framerate_guess + guess)/2
+
+        logging.debug(
+                "New framerate guess - ID: '%s', new: %d, old: %d",
+                    self.client.identifier, new_guess, 
+                    self._last_framerate_guess
+            )
+        
+        self._last_framerate_guess = new_guess
+
+        return new_guess
 
     def __len__(self):
         with self.lock:
