@@ -35,13 +35,14 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
     def handle(self):
         """
         Handles the UDP packet. Data is sent in the format:
-        challenge\x00frame\x00, where \x00 is a null byte acting as the delimiter
+        challenge\x45\x45frame\x45\x45, where \x45\x45 is a pair of characters
+        delimiting the fragment
         """
         try:
             data = self.request[0][:-1] # Strip trailing null byte
 
-            logging.debug("Received %s from %s", repr(data), self.client_address)
-            delimited = data.split("\x00")
+            #logging.debug("Received %s from %s", data, self.client_address)
+            delimited = data.split("\x45\x45")
 
             if len(delimited) != 2:
                 logging.warn("Invalid fragment received from %s", 

@@ -3,6 +3,7 @@ A simple test which reads from a video file and sends the frames
 """
 
 import socket
+import time
 import sys
 sys.path.append('..') # required to import from upper directory
 
@@ -25,10 +26,10 @@ c.connect(auth.receiver_address)
 
 video = cv2.VideoCapture('lepton_6.avi')
 
+framerate = video.get(5)
+
 while True:
     success, image = video.read()
-
-    print video.read()
 
     if not success:
         print "Unable to read image from the video file"
@@ -36,9 +37,15 @@ while True:
 
     ret, frame = cv2.imencode('.jpg', image)
 
-    to_send = "%s\x00%s\x00" % (auth.token, frame.tobytes())
-    print "Sending %s to %s" % (repr(to_send), auth.receiver_address)
+    print len(frame.tobytes())
+    print repr(frame.tobytes())
+
+    to_send = "%s\x45\x45%s" % (auth.token, frame.tobytes())
+
+    #print "Sending %s to %s" % (repr(to_send), auth.receiver_address)
     c.send(to_send)
+
+    time.sleep(1/framerate)
 
 c.close()
 
