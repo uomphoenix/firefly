@@ -87,35 +87,46 @@ class FrameCache(object):
 
         self._last_framerate_guess = INITIAL_FRAMERATE
 
+        # Use an incrementing ID to identify frames, so we send the correct
+        # ones to clients
+        self._frame_id = 0
+
     def add_frame(self, frame):
         with self.lock:
             ctime = time.time()
-
-            to_cache = (frame, ctime)
+            to_cache = (frame, ctime, self._frame_id)
 
             # The deque will automatially remove items from the left side of
             # the cache since we specified a maxlen (if we were appending to
             # the left side, it'd remove from the right side)
             self._cache.append(to_cache)
 
-            self.client.last_frame_update = ctime
+            self.client.last_frame_update = time.time()
+
+            self._frame_id += 1
 
             self.get_framerate()
 
-    def get_frame(self, time_cutoff):
+    def get_frame(self, last_fid):
         """
         Gets the most recent frame after the specified cutoff. We don't just
         get the most recent frame from the cache as that may not be the frame
         that the client requires. Therefore we use the timestamp.
         """
+
+        logging.debug("Attempting to get latest frame with ID cutoff %d", 
+            last_fid)
+
         with self.lock:
             to_send = None
 
-            for f, ts in self._cache:
-                if ts > time_cutoff:
-                    # Reached first frame which has a more recent timestamp.
-                    # This is the frame that we want to send
-                    to_send = f
+            for f, ts, fid in self._cache:
+                if fid > last_fid:
+                    # Get the frame with an ID > than the last one sent
+                    logging.debug("selected a frame")
+                    
+                    to_send = (f, ts, fid)
+
                     break
 
             return to_send
@@ -125,7 +136,8 @@ class FrameCache(object):
         A stream is considered timed out if there has been more than 60 seconds
         since the last frame was received
         """
-        return time.time() - self.client.last_frame_update > 60
+        return time.time() - self.client.last_frame_update > 10
+        #return False
 
     def get_framerate(self):
         """
@@ -145,11 +157,11 @@ class FrameCache(object):
 
         new_guess = (self._last_framerate_guess + guess)/2
 
-        logging.debug(
+        """logging.debug(
                 "New framerate guess - ID: '%s', new: %d, old: %d",
                     self.client.identifier, new_guess, 
                     self._last_framerate_guess
-            )
+            )"""
 
         self._last_framerate_guess = new_guess
 
