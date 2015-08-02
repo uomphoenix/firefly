@@ -32,5 +32,6 @@ relay = SettingsDict({
 # Observer settings
 observer = SettingsDict({
     "host": "192.168.101.129",
-    "port": 12345
+    "port": 12345,
+    "pool_size": 10
 })
