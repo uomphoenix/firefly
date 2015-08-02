@@ -100,6 +100,8 @@ class FrameCache(object):
 
             self.client.last_frame_update = ctime
 
+            self.get_framerate()
+
     def get_frame(self, time_cutoff):
         """
         Gets the most recent frame after the specified cutoff. We don't just
@@ -148,7 +150,7 @@ class FrameCache(object):
                     self.client.identifier, new_guess, 
                     self._last_framerate_guess
             )
-        
+
         self._last_framerate_guess = new_guess
 
         return new_guess
