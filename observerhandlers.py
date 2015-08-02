@@ -12,17 +12,37 @@ import tornado.web
 import tornado.concurrent
 from tornado import gen
 
-def get_frame(frame_cache, last_frame_time):
+
+class FrameHelper(object):
     """
-    Gets the latest frame from the given cache, and returns it using a future,
-    enabling async operation.
+    Since we cannot directly yield results inside a while loop, we simply wrap
+    them in a helper object. `get_frame` will be called as the loop condition,
+    and the frame will be accessible via `self.next_frame` if there is an
+    available frame.
     """
+    def __init__(self, frame_cache):
+        self.frame_cache = frame_cache
 
-    future = tornado.concurrent.Future()
+        self.next_frame = None
+        self.last_frame_time = time.time()
 
-    future.set_result(frame_cache.get_frame(last_frame_time))
+    def get_frame(self):
+        """
+        Gets the latest frame from the given cache. This must be run in a 
+        ThreadPoolExecutor instance, enabling async operation. The executor 
+        will handle setting the attributes of a Future object with either what
+        we return or an exception if one is raised.
 
-    return future
+        :return True if we were able to get a frame, False if no more frames
+                are available (i.e. stream is over)
+        """
+
+
+        self.next_frame = self.frame_cache.get_frame(self.last_frame_time)
+
+        self.last_frame_time = time.time()
+
+        return True
 
 class BaseHandler(tornado.web.RequestHandler):
     def __init__(self, application, request, **kwargs):
@@ -41,27 +61,19 @@ class StreamHandler(BaseHandler):
 
         self.set_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
 
-        while True:
-            # Get the appropriate feed cache based on the given slug
-            frame_cache = None
+        # FrameHelper takes a frame cache... 
+        # TODO: Implement getting the appropriate frame cache based on the slug.
+        f_helper = FrameHelper(None)
 
-            # Infinitely yield frames in a Future until the end of the stream!
-            # This is where the magic is - tornado will yield execution of 
-            # this handler to other handlers at this point, returning when
-            # the future is done. This enables us to serve many clients
-            # asynchronously. Note that we need to maintain a frame rate
-            # as well.
-            frame = yield get_frame(frame_cache, last_frame_time)
-
-            if frame is None:
-                # No frame found, end of stream
-                break
+        while (yield self.application.thread_pool.submit(f_helper.get_frame)):
+            # The yield statement in the while loop will execute the future
+            # returned by the thread_pool. The Future will return the result of
+            # `FrameHelper.get_frame`. If True, there is a frame available,
+            # which we can read out.
+            frame = f_helper.next_frame
 
             self.write(b"--frame\r\n"
                        b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
 
             # Flush the frame out
             self.flush()
-
-            # Set when we last sent a frame, so we can synchronize the frames
-            last_frame_time = time.time()
