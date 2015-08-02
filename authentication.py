@@ -97,8 +97,8 @@ class Authenticator(object):
                 host, client.uuid)
 
         except NoClientFoundError:
-            logging.debug("No client matching host '%s', creating a new one", 
-                host)
+            logging.debug("No client matching '%s' (%s), creating a new one", 
+                host, identifier)
 
             client = AuthenticatedClient(host, identifier)
 
@@ -188,7 +188,7 @@ class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
         # size, say, 4096.
         data = self.request.recv(64)
 
-        logging.debug("Received '%s' from '%s'", data, self.client_address[0])
+        logging.debug("Received '%s' from '%s'", repr(data), self.client_address[0])
 
         if data[0:2] == "\x01\x00":
             # Authentication attempt. Since this address is whitelisted (as it
@@ -197,7 +197,7 @@ class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
             client = None
 
             try:
-                client = self.server.authentiactor.add_new_client(
+                client = self.server.authenticator.add_new_client(
                             self.client_address[0],
                             data.split("\x00")[1]
                         )
