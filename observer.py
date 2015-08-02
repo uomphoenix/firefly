@@ -65,6 +65,8 @@ class ObserverServer(object):
     def shutdown(self):
         tornado.ioloop.IOLoop.instance().stop()
 
+        self.application.thread_pool.shutdown(wait = False)
+
     def server_close(self):
         pass
 
