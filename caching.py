@@ -9,6 +9,10 @@ import collections
 import time
 import threading
 
+class NoCacheFoundError(Exception):
+    """ Raised when no cache is found during a search """
+    pass
+
 class FeedCache(object):
     """
     The feed cache holds a FrameCache object for every feed being served
@@ -23,34 +27,57 @@ class FeedCache(object):
 
         self.lock = threading.RLock()
 
-    def cache_frame(self, uuid, frame):
+    def cache_frame(self, client, frame):
         """
         Add the frame to the appropriate cache. The cache object will handle
         the actual caching and maintaining the cache size, etc.
 
-        :param uuid The UUID of the transmitter who sent the frame
+        :param client The client object related to the transmitter that sent
+                      the frame
         :param frame The raw frame data
         """
         cache = None
 
         # We need to lock this so multiple caches cannot be created/overriden
-        # for the same UUID by multiple threads
+        # for the same client by multiple threads
         with self.lock:
-            if uuid not in self.caches:
-                cache = FrameCache(self.max_cache_size)
-                self.caches[uuid] = cache
+            if client not in self.caches:
+                cache = FrameCache(self.max_cache_size, client)
+
+                self.caches[client] = cache
+                client.cache = cache
 
             else:
-                cache = self.caches[uuid]
+                cache = self.caches[client]
 
         cache.add_frame(frame)
+
+    def get_cache(self, cache_id):
+        """
+        Tries to find a FrameCache matching the given cache_id.
+
+        :param cache_id The ID of the FrameCache to search for
+
+        :return A FrameCache object matching the given ID
+
+        :raises NoCacheFoundError When no cache can be found matching the ID
+        """
+
+        with self.lock:
+            for c in self.caches.values():
+                if c.client.identifier == cache_id:
+                    return c
+
+        raise NoCacheFoundError("No cache found matching ID %s" % cache_id)
 
 class FrameCache(object):
     """
     The cache will be accessed from multiple threads, therefore we need to
     make it thread safe.
     """
-    def __init__(self, size):
+    def __init__(self, size, client):
+        self.client = client
+
         self.size = size
         self._cache = collections.deque()
 

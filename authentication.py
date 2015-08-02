@@ -69,6 +69,8 @@ class AuthenticatedClient(object):
 
         self.last_frame_update = self.time_created
 
+        self.cache = None
+
 class Authenticator(object):
     def __init__(self):
         self.clients = []
