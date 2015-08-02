@@ -25,8 +25,12 @@ c = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 c.connect(auth.receiver_address)
 
 video = cv2.VideoCapture('lepton_6.avi')
+#video = cv2.VideoCapture('test.mp4')
 
 framerate = video.get(5)
+
+frame_cap = 999999999999
+frames_sent = 0
 
 while True:
     success, image = video.read()
@@ -37,15 +41,21 @@ while True:
 
     ret, frame = cv2.imencode('.jpg', image)
 
-    print len(frame.tobytes())
-    print repr(frame.tobytes())
+    #print len(frame.tobytes())
+    #print repr(frame.tobytes())
 
     to_send = "%s\x45\x45%s" % (auth.token, frame.tobytes())
 
-    #print "Sending %s to %s" % (repr(to_send), auth.receiver_address)
+    print "Sending %s to %s" % (repr(to_send), auth.receiver_address)
     c.send(to_send)
 
+    frames_sent += 1
+    if frames_sent >= frame_cap:
+        break
+
     time.sleep(1/framerate)
+
+print "Frames sent: " + str(frames_sent)
 
 c.close()
 
