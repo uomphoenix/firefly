@@ -53,15 +53,15 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
 
             # Need to verify the challenge token and store the frame under the
             # token's UID
-            uuid = self.server.authenticate(challenge_token)
+            client = self.server.authenticate(challenge_token)
 
-            if uuid is None:
+            if client is None:
                 logging.warn("Invalid challenge token given by %s", 
                     self.client_address)
 
             else:
                 # store the frame in the cache
-                self.server.cache_frame(uuid, frame)
+                self.server.cache_frame(client.uuid, frame)
 
         except:
             logging.exception("An error occurred handling fragment from %s",
@@ -95,19 +95,19 @@ class ReceiverServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
 
         :param token The token to verify
 
-        :return The UUID the token belongs to, or None if the toke cannot be
+        :return The client the token belongs to, or None if the toke cannot be
                 verified
         """
-        uuid = None
+        client = None
 
         try:
-            uuid = self.authenticator.authenticate_token(token)
+            client = self.authenticator.authenticate_token(token)
 
         except:
             logging.exception("Error authenticating token '%s'", token)
 
         finally:
-            return uuid
+            return client
 
     def cache_frame(self, uuid, frame):
         """
