@@ -15,7 +15,7 @@ server_address = ('192.168.101.129', 56789)
 
 
 # Test using the simple auth client in the authentication module
-auth = authentication.SimpleAuthenticationClient(server_address)
+auth = authentication.SimpleAuthenticationClient(server_address, "TEST STREAM")
 
 auth.authenticate()
 

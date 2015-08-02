@@ -139,7 +139,7 @@ class FrameCache(object):
         if cache_len == 0:
             return self._last_framerate_guess
 
-        time_diff = self._cache[:-1][1] - self._cache[0][1]
+        time_diff = self._cache[-1][1] - self._cache[0][1]
 
         guess = cache_len / (time_diff if time_diff > 0 else 1)
 

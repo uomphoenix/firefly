@@ -36,7 +36,7 @@ if __name__ == "__main__":
 
     # Initialize shared objects first
     authenticator = authentication.Authenticator()
-    feed_cache = caching.FeedCache(settings.receiver_settings.cache_size)
+    feed_cache = caching.FeedCache(settings.receiver.cache_size)
 
     # Instantiate server objects
     ## Receiver
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     ## Observer server
     observer_server_address = (
-        settings.observer.host
+        settings.observer.host,
         settings.observer.port
     )
 

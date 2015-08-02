@@ -28,7 +28,7 @@ class ObserverApplication(tornado.web.Application):
     def __init__(self, feed_cache, pool_size):
         handlers = [
             (r"/", observerhandlers.RootHandler),
-            (r"/feed/([a-zA-Z0-9_])", observerhandlers.StreamHandler),
+            (r"/feed/([a-zA-Z0-9_]+)", observerhandlers.StreamHandler),
         ]
 
         settings = {
