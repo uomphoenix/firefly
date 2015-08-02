@@ -13,6 +13,9 @@ from tornado.web import HTTPError
 import tornado.concurrent
 from tornado import gen
 
+class NoFrameFoundError(Exception):
+    """ Raised when we cannot get the next frame for some reason """
+    pass
 
 class FrameHelper(object):
     """
@@ -25,6 +28,9 @@ class FrameHelper(object):
         self.frame_cache = frame_cache
 
         self.next_frame = None
+        # Start at -1 so we can get the 0th frame
+        self.last_frame_id = -1
+
         self.last_frame_time = time.time()
 
     def get_frame(self):
@@ -38,22 +44,28 @@ class FrameHelper(object):
                 are available (i.e. stream is over)
         """
 
-        next_frame = None
+        frame_info = None
         stream_finished = False
 
-        while (next_frame is None) and (not stream_finished):
-            # Sleep the frame rate
-            time.sleep(self.frame_cache.get_framerate())
+        while frame_info is None and not stream_finished:
+            # Sleep the frame period (1/framerate)
+            time.sleep(1/self.frame_cache.get_framerate())
+            #time.sleep(1)
 
             stream_finished = self.frame_cache.is_stream_timed_out()
 
-            next_frame = self.frame_cache.get_frame(self.last_frame_time)
+            frame_info = self.frame_cache.get_frame(self.last_frame_id)
+
+            stream_finished = time.time() - self.last_frame_time > 10
 
         if stream_finished:
             return False
 
         else:
-            self.next_frame = next_frame
+            self.next_frame, _, self.last_frame_id = frame_info
+
+            logging.debug("Got next frame for cache %s. Frame ID: %d", 
+                self.frame_cache, self.last_frame_id)
 
             self.last_frame_time = time.time()
 
@@ -94,6 +106,8 @@ class StreamHandler(BaseHandler):
             # `FrameHelper.get_frame`. If True, there is a frame available,
             # which we can read out.
             frame = f_helper.next_frame
+
+            logging.debug("Sending frame %s to client", repr(frame))
 
             self.write(b"--frame\r\n"
                        b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
