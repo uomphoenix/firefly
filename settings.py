@@ -21,7 +21,7 @@ authentication = SettingsDict({
 receiver = SettingsDict({
     "host": "192.168.101.129",
     "port": 56790,
-    "cache_size": 10
+    "cache_size": 100
 })
 
 # Relay settings
