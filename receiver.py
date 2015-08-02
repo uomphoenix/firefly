@@ -39,10 +39,12 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
         delimiting the fragment
         """
         try:
-            data = self.request[0][:-1] # Strip trailing null byte
+            data = self.request[0]
 
-            #logging.debug("Received %s from %s", data, self.client_address)
+            #logging.debug("Received %s from %s", repr(data), self.client_address)
             delimited = data.split("\x45\x45")
+
+            #print delimited
 
             if len(delimited) != 2:
                 logging.warn("Invalid fragment received from %s", 
