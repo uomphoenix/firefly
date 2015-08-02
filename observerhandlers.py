@@ -9,6 +9,7 @@ import logging
 import time
 
 import tornado.web
+from tornado.web import HTTPError
 import tornado.concurrent
 from tornado import gen
 
@@ -37,12 +38,26 @@ class FrameHelper(object):
                 are available (i.e. stream is over)
         """
 
+        next_frame = None
+        stream_finished = False
 
-        self.next_frame = self.frame_cache.get_frame(self.last_frame_time)
+        while (next_frame is None) and (not stream_finished):
+            # Sleep the frame rate
+            time.sleep(self.frame_cache.get_framerate())
 
-        self.last_frame_time = time.time()
+            stream_finished = self.frame_cache.is_stream_timed_out()
 
-        return True
+            next_frame = self.frame_cache.get_frame(self.last_frame_time)
+
+        if stream_finished:
+            return False
+
+        else:
+            self.next_frame = next_frame
+
+            self.last_frame_time = time.time()
+
+            return True
 
 class BaseHandler(tornado.web.RequestHandler):
     def __init__(self, application, request, **kwargs):
@@ -57,13 +72,21 @@ class RootHandler(BaseHandler):
 class StreamHandler(BaseHandler):
     @gen.coroutine
     def get(self, slug):
-        last_frame_time = time.time()
+        # FrameHelper takes a frame cache... 
+        try:
+            frame_cache = self.application.feed_cache.get_cache(slug)
+
+        except:
+            logging.exception(
+                    "Excepting getting frame cache matching identifier '%s'",
+                        slug
+                )
+
+            raise HTTPError(400)
+
+        f_helper = FrameHelper(frame_cache)
 
         self.set_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
-
-        # FrameHelper takes a frame cache... 
-        # TODO: Implement getting the appropriate frame cache based on the slug.
-        f_helper = FrameHelper(None)
 
         while (yield self.application.thread_pool.submit(f_helper.get_frame)):
             # The yield statement in the while loop will execute the future
