@@ -2,7 +2,7 @@
 authentication.py
 
 Video feed transmitters are required to authenticate before the feed is
-acknowledged. This class handles that authentication and generates a
+acknowledged. This module handles that authentication and generates a
 challenge token which must be included in each transmitted frame. Since
 UDP source address can be spoofed, this is necessary to prevent malicious
 users injecting undesired frames into our stream! All relays authenticate
@@ -55,8 +55,9 @@ class AuthenticatedClient(object):
     A simple data object which retains information for a client who has
     authenticated.
     """
-    def __init__(self, host, token = None):
+    def __init__(self, host, identifier, token = None):
         self.host = host
+        self.identifier = identifier
         self.time_created = time.time()
 
         self.uuid = uuid.uuid4()
@@ -74,21 +75,21 @@ class Authenticator(object):
 
         self.lock = threading.Lock()
 
-    def create_token(self, host):
+    def add_new_client(self, host, identifier):
         """
-        Attempts to create a token for the given host. If a token exists,
-        the existing one will be returned.
+        Attempts to create a new client object with the given information. The
+        host and identifier should be a unique combination.
 
         :param host The host address of an authenticating client
+        :param identifier The client's identifier string
 
-        :return A challenge token, new or existing
+        :return AuthenticatedClient The new (or existing) client object
+
         """
-        # Try get an existing client first. If the client does not exist, we
-        # create a new instance for it.
         client = None
 
         try:
-            client = self.get_client_by_host(host)
+            client = self.get_client_by_info(host, identifier)
 
             logging.debug("Found client matching host '%s', uuid: '%s'",
                 host, client.uuid)
@@ -97,18 +98,16 @@ class Authenticator(object):
             logging.debug("No client matching host '%s', creating a new one", 
                 host)
 
-            client = AuthenticatedClient(host)
+            client = AuthenticatedClient(host, identifier)
 
             with self.lock:
                 self.clients.append(client)
 
-        except:
-            logging.exception("Unknown exception obtaining client object")
-        
+            logging.debug("Created client for '%s' ('%s'). uuid: %s, token: %s", 
+                host, identifier, client.uuid, client.token)
+
         finally:
-            logging.debug("Created token for '%s'. uuid: %s, token: %s", 
-                host, client.uuid, client.token)
-            return client.token
+            return client
 
     def authenticate_token(self, token):
         """
@@ -118,7 +117,7 @@ class Authenticator(object):
 
         :param token The token to authenticate
 
-        :return The UUID matching the token
+        :return The client matching the token
 
         :raises InvalidAuthenticationTokenError When the token is invalid
         """
@@ -126,15 +125,15 @@ class Authenticator(object):
         try:
             client = self.get_client_by_token(token)
 
-            return client.uuid
+            return client
 
         except NoClientFoundError:
             raise InvalidAuthenticationTokenError("")
 
-    def get_client_by_host(self, host):
+    def get_client_by_info(self, host, identifier):
         with self.lock:
             for c in self.clients:
-                if c.host == host:
+                if c.host == host and c.identifier == identifier:
                     return c
 
             raise NoClientFoundError(
@@ -158,7 +157,10 @@ class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
     connection remains open until either end hangs up. 
 
     An authentication attempt is in the form:
-    \x01\x00
+    \x01\x00<identifier>\x00
+    where <identifier> is a custom string used to identify the source, ideally
+    well named so as to allow viewers to identify the stream.
+
 
     A response is in the form:
     \x01\x00<challenge_token>\x00<receiver ip>\x00<receiver port>\x00
@@ -190,11 +192,20 @@ class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
             # Authentication attempt. Since this address is whitelisted (as it
             # was successfully verified by the server in `verify_request`), we
             # can safely acknowledge the authentication.
+            client = None
+
+            try:
+                client = self.server.authentiactor.add_new_client(
+                            self.client_address[0],
+                            data.split("\x00")[1]
+                        )
+
+            except:
+                logging.exception("An exception occurred creating a new client")
+                return
 
             self.request.send("\x01\x00%s\x00%s\x00%s\x00" % (
-                        self.server.authenticator.create_token(
-                                self.client_address[0]
-                            ),
+                        client.token,
                         self.server.receiver_address[0],
                         self.server.receiver_address[1]
                     )
@@ -240,10 +251,11 @@ class SimpleAuthenticationClient(object):
     A basic implementation of a client which authenticates with the server and
     stores the retrieved token and receiver address.
     """
-    def __init__(self, server_address):
+    def __init__(self, server_address, identifier):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         self.server_address = server_address
+        self.identifier = identifier
 
         self.authenticated = False
         self.connected = False
@@ -258,7 +270,7 @@ class SimpleAuthenticationClient(object):
         self._connect()
 
         # Send auth code
-        self.socket.send("\x01\x00")
+        self.socket.send("\x01\x00%s\x00" % (self.identifier,))
 
         # Wait for response
         resp = self.socket.recv(128)
