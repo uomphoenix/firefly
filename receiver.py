@@ -61,7 +61,7 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
 
             else:
                 # store the frame in the cache
-                self.server.cache_frame(client.uuid, frame)
+                self.server.cache_frame(client, frame)
 
         except:
             logging.exception("An error occurred handling fragment from %s",
@@ -109,19 +109,19 @@ class ReceiverServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         finally:
             return client
 
-    def cache_frame(self, uuid, frame):
+    def cache_frame(self, client, frame):
         """
         Add the frame to the appropriate cache. The cache object will handle
         the actual caching and maintaining the cache size, etc.
 
-        :param uuid The UUID of the transmitter who sent the frame
+        :param client The client corresponding to the frame transmitter
         :param frame The raw frame data
         """
         try:
-            self.feed_cache.cache_frame(uuid, frame)
+            self.feed_cache.cache_frame(client, frame)
             
         except:
-            logging.exception("Exception caching frame for %s", uuid)
+            logging.exception("Exception caching frame for %s", client)
 
     def stop_server(self):
         """
