@@ -6,9 +6,14 @@ clients in order to deliver a live stream.
 """
 
 import logging
-import concurrent.futures
 
-from settings import observer as obs_settings
+try:
+    import concurrent.futures
+except ImportError:
+    print """The Firefly daemon requires the `futures` package, a backport of 
+    the Py3 futures module. Install using `pip install futures`
+    """
+    quit()
 
 try:
     import tornado
@@ -21,6 +26,8 @@ except ImportError:
     Install tornado using `pip install tornado`, or visit http://www.tornadoweb.org/
     """
     quit()
+
+from settings import observer as obs_settings
 
 import observerhandlers
 
