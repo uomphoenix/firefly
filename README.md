@@ -45,7 +45,7 @@ from any source (such as a video camera) to the receiver address which is
 received upon authentication and set as an attribute in the object.
 
 Once frames are being received by the daemon's receiver module, they can
-be viewed by navigating to /feed/<identifer> on the observer's listen
+be viewed by navigating to http://host:port/feed/<identifer> on the observer's listen
 address. Alternatively, the root path on the observer will serve a page
 listing all existing feeds. Only the most recent frames (based on the cache
 size) will be served in the live stream. 10 seconds of sending no new frames
@@ -64,3 +64,5 @@ will disconnect a client (configurable in `observerhandlers.FrameHelper`).
 + Video feeds are not currently written to disk, so there is no local storage.
   This is a feature that we are aiming to implement ASAP.
 
++ There is currently no authentication required for viewing a stream - whoever
+  has the link can view it.
