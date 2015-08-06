@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block body %}
+  {% if len(identifiers) == 0 %}
+    No feeds available
+  {% else %}
+    {% for i in identifiers %}
+      <a href="/feed/{{ i }}">{{ i }}</a><br>
+    {% end %}
+  {% end %}
+{% end %}

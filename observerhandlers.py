@@ -77,9 +77,9 @@ class BaseHandler(tornado.web.RequestHandler):
 
 class RootHandler(BaseHandler):
     def get(self):
-        self.write("list of streams:")
+        identifiers = [ c.identifier for c in self.application.feed_cache.caches.keys() ]
 
-        # print a list of streams in some templated page
+        self.render('index.html', identifiers = identifiers)
 
 class StreamHandler(BaseHandler):
     @gen.coroutine

@@ -6,6 +6,7 @@ clients in order to deliver a live stream.
 """
 
 import logging
+import os
 
 try:
     import concurrent.futures
@@ -40,7 +41,8 @@ class ObserverApplication(tornado.web.Application):
 
         settings = {
             "debug": True,
-            "autoreload": True
+            "autoreload": True,
+            "template_path": os.path.join(os.path.dirname(__file__), "templates")
         }
 
         super(ObserverApplication, self).__init__(handlers, **settings)
