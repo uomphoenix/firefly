@@ -32,9 +32,6 @@ import string
 
 from settings import authentication as auth_settings
 
-# Temporarily hardcode this
-CLIENT_WHITELIST = ['192.168.101.1']
-
 def rand_token(length, chars = string.digits):
     """
     At the moment, the token is only digits. This is to conserve bandwidth. It
@@ -241,7 +238,7 @@ class AuthenticationServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     def verify_request(self, request, client_address):
         chost, cport = client_address
 
-        allowed = chost in CLIENT_WHITELIST
+        allowed = chost in auth_settings.whitelist
 
         logging.debug("Verifying request from '%s'. Allowed: %s", 
             chost, allowed)

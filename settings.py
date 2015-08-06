@@ -15,6 +15,7 @@ class SettingsDict(dict):
 authentication = SettingsDict({
     "host": "192.168.101.129",
     "port": 56789,
+    "whitelist": [ '192.168.101.1' ]
 })
 
 # Receiver settings
@@ -33,5 +34,5 @@ relay = SettingsDict({
 observer = SettingsDict({
     "host": "192.168.101.129",
     "port": 12345,
-    "pool_size": 10
+    "pool_size": 50
 })
