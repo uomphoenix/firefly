@@ -15,10 +15,13 @@ HTTP streams can also be viewed in popular video players such as VLC and
 gstreamer.
 
 # Installation
-Firefly requires Python 2.6 or 2.7. The following packages are also required:
+Firefly runs with Python 2.6 or 2.7, it may work on Python 3 but it has not
+been tested. The following packages are also required:
 
 + tornado (A fast asynchronous webserver framework)
 + futures (A backport of the Py3 futures module)
+
+Once the packages are installed, all that is required is this repository.
 
 # Configuration
 Basic configuration is supplied in the file `settings.py`, which has 
