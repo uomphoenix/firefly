@@ -54,7 +54,7 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
             #logging.debug("Received %s from %s", repr(data), self.client_address)
             delimited = data.split("\x00")
 
-            print delimited
+            #print delimited
 
             if len(delimited) < 5:
                 logging.warn("Invalid fragment received from %s", 
@@ -62,12 +62,21 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
 
                 return
 
-            challenge_token = delimited[0]
-            sequence_num = delimited[1]
-            max_fragments = delimited[2]
-            fragment_num = delimited[3]
+            try:
+                challenge_token = delimited[0]
+                sequence_num = int(delimited[1])
+                max_fragments = int(delimited[2])
+                fragment_num = int(delimited[3])
+            except ValueError:
+                logging.exception("Unable to cast packet data to int")
+                return
             
-            frame = "".join(delimited[4:-1])
+            fragment = "\x00".join(delimited[4:-1])
+
+            #if sequence_num == 24:
+                #logging.debug("Received %s from %s", repr(data), self.client_address)
+                #logging.debug("Received fragment of length %s", len(fragment))
+                #logging.debug(delimited)
 
             # Need to verify the challenge token and store the frame under the
             # token's UID
@@ -79,7 +88,7 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
 
             else:
                 # store the frame in the cache
-                self.server.cache_frame(client, sequence_num, max_fragments, fragment_num, frame)
+                self.server.cache_frame(client, sequence_num, max_fragments, fragment_num, fragment)
 
         except:
             logging.exception("An error occurred handling fragment from %s",
