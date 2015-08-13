@@ -107,7 +107,8 @@ class StreamHandler(BaseHandler):
             # which we can read out.
             frame = f_helper.next_frame
 
-            logging.debug("Sending frame %s to client", repr(frame))
+            #logging.debug("Sending frame %s to client", repr(frame))
+            logging.debug("Sending frame %d to client", f_helper.last_frame_id)
 
             self.write(b"--frame\r\n"
                        b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
