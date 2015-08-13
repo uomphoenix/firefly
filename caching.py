@@ -8,6 +8,7 @@ import logging
 import collections
 import time
 import threading
+import operator
 
 class NoCacheFoundError(Exception):
     """ Raised when no cache is found during a search """
@@ -27,14 +28,18 @@ class FeedCache(object):
 
         self.lock = threading.RLock()
 
-    def cache_frame(self, client, frame):
+    def cache_frame(self, client, sequence_num, max_fragments, fragment_num, 
+                    frame):
         """
         Add the frame to the appropriate cache. The cache object will handle
         the actual caching and maintaining the cache size, etc.
 
         :param client The client object related to the transmitter that sent
                       the frame
-        :param frame The raw frame data
+        :param sequence_num The ID of the frame
+        :param max_fragments The number of fragments in the sequence
+        :param fragment_num The ID of the fragment in the sequence
+        :param frame The raw frame data, potentially a fragment
         """
         cache = None
 
@@ -50,7 +55,7 @@ class FeedCache(object):
             else:
                 cache = self.caches[client]
 
-        cache.add_frame(frame)
+        cache.add_frame(sequence_num, max_fragments, fragment_num, frame)
 
     def get_cache(self, cache_id):
         """
@@ -70,7 +75,7 @@ class FeedCache(object):
 
         raise NoCacheFoundError("No cache found matching ID %s" % cache_id)
 
-INITIAL_FRAMERATE = 15
+INITIAL_FRAMERATE = 30
 
 class FrameCache(object):
     """
@@ -83,6 +88,10 @@ class FrameCache(object):
         self.size = size
         self._cache = collections.deque(maxlen = size)
 
+        # The fragment cache holds fragments until there's a complete frame to
+        # build
+        self._fragment_cache = {}
+
         self.lock = threading.RLock()
 
         self._last_framerate_guess = INITIAL_FRAMERATE
@@ -91,8 +100,31 @@ class FrameCache(object):
         # ones to clients
         self._frame_id = 0
 
-    def add_frame(self, frame):
+    def add_frame(self, sequence_num, max_fragments, fragment_num, fragment):
+        """
+        Adds a frame to this frame cache (or a fragment)
+
+        :param sequence_num A number identifying the fragment's sequence
+        :param max_fragments The number of fragments in the sequence
+        :param fragment_num The number of this fragment
+        :param fragment The frame fragment
+        """
         with self.lock:
+            # Try to get the fragment matching the frame...
+            fragment_cache = None
+            if sequence_num not in self._fragment_cache:
+                fragment_cache = FragmentCache(sequence_num, max_fragments)
+            else:
+                fragment_cache = self._fragment_cache[sequence_num]
+
+            fragment_cache.add_fragment(fragment_num, fragment)
+
+            frame = None
+            if fragment_cache.is_fragment_complete():
+                frame = fragment_cache.get_complete_fragment()
+            else:
+                return
+
             ctime = time.time()
             to_cache = (frame, ctime, self._frame_id)
 
@@ -170,3 +202,41 @@ class FrameCache(object):
     def __len__(self):
         with self.lock:
             return len(self._cache)
+
+class FragmentCache(object):
+    def __init__(self, sequence_num, max_fragments):
+
+        self.sequence_num = sequence_num
+
+        self.max_fragments = max_fragments
+
+        self._cache = []
+
+        self.lock = threading.RLock()
+
+        self._complete_fragment = None
+
+    def is_fragment_complete(self):
+        with self.lock:
+            return len(self._cache) == self.max_fragments
+
+    def add_fragment(self, fragment_id, fragment):
+        with self.lock:
+            self._cache.append((fragment_id, fragment))
+
+    def get_complete_fragment(self):
+        with self.lock:
+            if self._complete_fragment is not None:
+                return self._complete_fragment
+
+            else:
+                # Construct the complete fragment
+
+                # We need to sort by fragment ID first, as the fragments may
+                # not necessarily come in order...
+                self._cache.sort(key = operator.itemgetter(0))
+
+                # Join all fragments
+                frame = "".join(x[1] for x in self._cache)
+
+                self._complete_fragment = frame

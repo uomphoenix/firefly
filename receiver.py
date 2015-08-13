@@ -35,24 +35,39 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
     def handle(self):
         """
         Handles the UDP packet. Data is sent in the format:
-        challenge\x45\x45frame\x45\x45, where \x45\x45 is a pair of characters
-        delimiting the fragment
+        <challenge>\x00<seq num>\x00<max fragments>\x00<fragment num>\x00<frame>\x00,
+        where \x00 is a character delimiting the fragment. <seq num> is a 
+        unique number identifying the frame and <fragment num> is a number 
+        identifying which part of the frame this fragment belongs to. 
+        <max fragments> is a number indicating how many fragments are in the
+        sequence.
+        Note that the frame itself may have \x00 in its binary, therefore we
+        should simply join everything after our control parameters.
+
+        This protocol allows for 'split-packet' sending of frames, i.e. a frame
+        can be split into multiple packets, allowing large frames to be sent
+        despite the ~65kB limit of UDP packets.
         """
         try:
             data = self.request[0]
 
             #logging.debug("Received %s from %s", repr(data), self.client_address)
-            delimited = data.split("\x45\x45")
+            delimited = data.split("\x00")
 
-            #print delimited
+            print delimited
 
-            if len(delimited) != 2:
+            if len(delimited) < 5:
                 logging.warn("Invalid fragment received from %s", 
                     self.client_address)
 
                 return
 
-            challenge_token, frame = delimited
+            challenge_token = delimited[0]
+            sequence_num = delimited[1]
+            max_fragments = delimited[2]
+            fragment_num = delimited[3]
+            
+            frame = "".join(delimited[4:-1])
 
             # Need to verify the challenge token and store the frame under the
             # token's UID
@@ -64,7 +79,7 @@ class ReceiverHandler(SocketServer.BaseRequestHandler):
 
             else:
                 # store the frame in the cache
-                self.server.cache_frame(client, frame)
+                self.server.cache_frame(client, sequence_num, max_fragments, fragment_num, frame)
 
         except:
             logging.exception("An error occurred handling fragment from %s",
@@ -112,16 +127,21 @@ class ReceiverServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         finally:
             return client
 
-    def cache_frame(self, client, frame):
+    def cache_frame(self, client, sequence_num, max_fragments, fragment_num, 
+                    frame):
         """
         Add the frame to the appropriate cache. The cache object will handle
         the actual caching and maintaining the cache size, etc.
 
         :param client The client corresponding to the frame transmitter
-        :param frame The raw frame data
+        :param sequence_num The ID of the frame
+        :param max_fragments The number of fragments in the sequence
+        :param fragment_num The ID of the fragment in the sequence
+        :param frame The raw frame data (posssibly split)
         """
         try:
-            self.feed_cache.cache_frame(client, frame)
+            self.feed_cache.cache_frame(client, sequence_num, max_fragments, 
+                                        fragment_num, frame)
             
         except:
             logging.exception("Exception caching frame for %s", client)
