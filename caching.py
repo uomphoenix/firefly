@@ -14,6 +14,11 @@ class NoCacheFoundError(Exception):
     """ Raised when no cache is found during a search """
     pass
 
+class IncompleteFrameError(object):
+    """ Raised when trying to get a frame from fragments when insufficient
+    fragments exist """
+    pass
+
 class FeedCache(object):
     """
     The feed cache holds a FrameCache object for every feed being served
@@ -96,10 +101,6 @@ class FrameCache(object):
 
         self._last_framerate_guess = INITIAL_FRAMERATE
 
-        # Use an incrementing ID to identify frames, so we send the correct
-        # ones to clients
-        self._frame_id = 0
-
     def add_frame(self, sequence_num, max_fragments, fragment_num, fragment):
         """
         Adds a frame to this frame cache (or a fragment)
@@ -114,10 +115,19 @@ class FrameCache(object):
             fragment_cache = None
             if sequence_num not in self._fragment_cache:
                 fragment_cache = FragmentCache(sequence_num, max_fragments)
+
+                self._fragment_cache[sequence_num] = fragment_cache
             else:
                 fragment_cache = self._fragment_cache[sequence_num]
 
             fragment_cache.add_fragment(fragment_num, fragment)
+
+            """logging.debug("Added fragment to fragment cache. seqnum: %d,"
+                         " fragn: %d, maxfragn: %d", 
+                         sequence_num, fragment_num, max_fragments)
+
+            logging.debug("FragmentCache complete: %s, frag cache len: %d", 
+                fragment_cache.is_fragment_complete(), len(fragment_cache))"""
 
             frame = None
             if fragment_cache.is_fragment_complete():
@@ -125,8 +135,15 @@ class FrameCache(object):
             else:
                 return
 
+
+            if frame[-1] != "\xd9":
+                logging.warn("Frame does not end in \\xd9")
+                #logging.debug(repr(frame))
+
             ctime = time.time()
-            to_cache = (frame, ctime, self._frame_id)
+            to_cache = (frame, ctime, sequence_num)
+
+            #logging.debug("Adding %s to cache", to_cache)
 
             # The deque will automatially remove items from the left side of
             # the cache since we specified a maxlen (if we were appending to
@@ -134,8 +151,6 @@ class FrameCache(object):
             self._cache.append(to_cache)
 
             self.client.last_frame_update = time.time()
-
-            self._frame_id += 1
 
             self.get_framerate()
 
@@ -146,8 +161,8 @@ class FrameCache(object):
         that the client requires. Therefore we use the timestamp.
         """
 
-        logging.debug("Attempting to get latest frame with ID cutoff %d", 
-            last_fid)
+        #logging.debug("Attempting to get latest frame with ID cutoff %d", 
+        #    last_fid)
 
         with self.lock:
             to_send = None
@@ -222,16 +237,19 @@ class FragmentCache(object):
 
     def add_fragment(self, fragment_id, fragment):
         with self.lock:
+            #logging.debug("Adding fragment %d to fragment cache for seq %d",
+            #    fragment_id, self.sequence_num)
+
             self._cache.append((fragment_id, fragment))
 
     def get_complete_fragment(self):
         with self.lock:
-            if self._complete_fragment is not None:
-                return self._complete_fragment
+            if not self.is_fragment_complete():
+                raise IncompleteFrameError("Frame %s is not complete" % (
+                    self.sequence_num))
 
-            else:
-                # Construct the complete fragment
-
+            if self._complete_fragment is None:
+                # Construct the frame from fragments
                 # We need to sort by fragment ID first, as the fragments may
                 # not necessarily come in order...
                 self._cache.sort(key = operator.itemgetter(0))
@@ -240,3 +258,10 @@ class FragmentCache(object):
                 frame = "".join(x[1] for x in self._cache)
 
                 self._complete_fragment = frame
+
+
+            return self._complete_fragment
+
+    def __len__(self):
+        with self.lock:
+            return len(self._cache)
