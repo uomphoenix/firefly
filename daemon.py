@@ -18,7 +18,6 @@ import os
 import sys
 import time
 
-
 from pprint import pprint
 
 import settings
@@ -28,6 +27,10 @@ import caching
 import receiver
 import relay
 import observer
+import storage
+
+# Import here after we've done checking in the observer
+import tornado.ioloop
 
 logging.basicConfig(level = logging.DEBUG)
 
@@ -37,6 +40,7 @@ if __name__ == "__main__":
     # Initialize shared objects first
     authenticator = authentication.Authenticator()
     feed_cache = caching.FeedCache(settings.receiver.cache_size)
+    storage_manager = storage.VideoStorageManager(feed_cache)
 
     # Instantiate server objects
     ## Receiver
@@ -58,7 +62,7 @@ if __name__ == "__main__":
     )
 
     auth_server = authentication.AuthenticationServer(auth_server_address, 
-        authenticator, receiver_server.server_address)
+        authenticator, receiver_server.server_address, storage_manager)
     
     logging.info("Authentication server listening on %s:%s" % \
         auth_server.server_address)
@@ -82,6 +86,12 @@ if __name__ == "__main__":
     auth_thread = threading.Thread(target = auth_server.serve_forever)
     auth_thread.daemon = True
 
+    # Add a timer to the main thread (tornado IOLoop) which calls the storage
+    # manager's cache flush method.
+    storage_timer = tornado.ioloop.PeriodicCallback(
+                                        storage_manager.flush_caches, 
+                                        settings.storage.flush_timer)
+
     try:
         logging.info("Starting receiver thread ...")
         recv_thread.start()
@@ -89,12 +99,17 @@ if __name__ == "__main__":
         logging.info("Starting auth thread ...")
         auth_thread.start()
 
-        logging.info("Running observer server in main thread ...")
+        logging.info("Adding storage timer to tornado IOLoop")
+        storage_timer.start()
+
+        logging.info("Running tornado IOLoop and observer server in main thread ...")
         observer_server.run()
 
     except KeyboardInterrupt:
         # Exit cleanly
         print "KeyboardInterrupt. Exiting"
+
+        storage_timer.stop()
         servers = [ auth_server, receiver_server, observer_server ]
         
         for s in servers:

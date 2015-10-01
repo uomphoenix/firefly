@@ -15,14 +15,14 @@ class SettingsDict(dict):
 authentication = SettingsDict({
     "host": "192.168.101.129",
     "port": 56789,
-    "whitelist": [ '192.168.101.1' ]
+    "whitelist": [ '192.168.101.1', '192.168.101.129', "192.168.101.128" ]
 })
 
 # Receiver settings
 receiver = SettingsDict({
     "host": "192.168.101.129",
     "port": 56790,
-    "cache_size": 100
+    "cache_size": 100,
 })
 
 # Relay settings
@@ -35,4 +35,10 @@ observer = SettingsDict({
     "host": "192.168.101.129",
     "port": 12345,
     "pool_size": 50
+})
+
+storage = SettingsDict({
+    "dir": "storage",
+    "db": "firefly.db",
+    "flush_timer": 1000 # Once every 1000ms
 })
