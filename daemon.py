@@ -117,6 +117,8 @@ if __name__ == "__main__":
             s.shutdown()
             s.server_close()
 
+        storage_manager.close_all()
+
     except:
         logging.exception("Unknown exception in main thread. Exiting")
 

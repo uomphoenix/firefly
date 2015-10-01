@@ -2,6 +2,8 @@
 cache.py
 
 Provides methods and classes for maintaning and managing a video frame cache.
+This module and its classes are thread-safe, as they are shared between
+multiple application threads.
 """
 
 import logging
