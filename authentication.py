@@ -203,6 +203,9 @@ class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
                 logging.exception("An exception occurred creating a new client")
                 return
 
+
+            self.server.storage_manager.add_client(client)
+
             self.request.send("\x01\x00%s\x00%s\x00%s\x00" % (
                         client.token,
                         self.server.receiver_address[0],
@@ -223,7 +226,7 @@ class AuthenticationServerHandler(SocketServer.BaseRequestHandler):
 
 class AuthenticationServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     def __init__(self, server_address, authenticator,
-                 receiver_address,
+                 receiver_address, storage_manager,
                  handler = AuthenticationServerHandler):
         # Allow binding to the same address if the app didn't exit cleanly
         self.allow_reuse_address = True
@@ -234,6 +237,7 @@ class AuthenticationServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
 
         self.authenticator = authenticator
         self.receiver_address = receiver_address
+        self.storage_manager = storage_manager
 
     def verify_request(self, request, client_address):
         chost, cport = client_address
