@@ -21,12 +21,12 @@ class FFVideoWriter(object):
     """
     Wraps the video writing
     """
-    def __init__(self, filename, fps, dim = (640,480), colour = True, 
-                 codec = cv2.cv.CV_FOURCC('P','I','M','1')):
+    def __init__(self, filename, fps, dim = (60,80), colour = True, 
+                 codec = cv2.cv.CV_FOURCC('M','J','P','G')):
         
 
         self.filename = os.path.join(settings.storage.dir, filename)
-        self._writer = cv2.VideoWriter(self.filename, codec, fps, dim, colour)
+        self._writer = cv2.VideoWriter(self.filename, 0, fps, dim, colour)
 
         logging.debug("Attempted to open video file %s. Opened: %d",
             self.filename, self._writer.isOpened())
@@ -40,17 +40,12 @@ class FFVideoWriter(object):
                 self.filename)
 
     def end(self):
-        try:
-            #self._writer.release()
-            pass
-
-        except:
-            logging.exception("Exception releasing video file")
-
         del self._writer
+        self._writer = None
 
     def __del__(self):
-        cv2.cv.cvReleaseVideoWriter(self._writer)
+        if self._writer is not None:
+            del self._writer
 
 class VideoStorageManager(object):
     """
@@ -84,7 +79,7 @@ class VideoStorageManager(object):
             self._flush_counter[client] = -1
 
             video_name = client.identifier + time.strftime("_%Y-%m-%d-%H-%M") + '.avi'
-            self._writers[client] = FFVideoWriter(video_name, 24)
+            self._writers[client] = FFVideoWriter(video_name, 24, dim = (60, 80))
 
 
     def flush_caches(self):
@@ -93,7 +88,9 @@ class VideoStorageManager(object):
         a count of what frame was last flushed, much like the observer
         maintains a count so clients receive the latest frame...
         """
-        logging.debug("Flushing caches")
+        #logging.debug("Flushing caches")
+        finished = []
+
         # We use the cache's lock to prevent concurrency issues with other
         # threads needing the same data while we're iterating...
         for client, writer in self._writers.iteritems():
@@ -104,8 +101,24 @@ class VideoStorageManager(object):
             if client.cache is None:
                 continue
 
-            frame, ts, fid = client.cache.get_frame(self._flush_counter[client])
+            next = client.cache.get_frame(self._flush_counter[client])
+            if next is None:
+                finished.append(client)
+                continue
+
+            frame, ts, fid = next
 
             self._flush_counter[client] = fid
 
             writer.write(frame)
+
+        # Temp fix for cleaning up finished streams...
+        for client in finished:
+            self._writers[client].end()
+            del self._writers[client]
+
+            del self._flush_counter[client]
+
+    def close_all(self):
+        for writer in self._writers.values():
+            writer.end()
