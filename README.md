@@ -52,17 +52,7 @@ size) will be served in the live stream. 10 seconds of sending no new frames
 will disconnect a client (configurable in `observerhandlers.FrameHelper`).
 
 # Limitations/NYI
-+ Some frame sources which have extremely high resolutions are not compatible 
-  with Firefly at this point in time. This is because said frames are too large
-  to be sent in a single packet, and cause a network overflow. Since the
-  receiver does not currently support split-frame packets (i.e. multiple
-  packets for a single frame), these sources are not supported.
 
 + Currently feeds will never expire, and require a restart of the daemon to
   clear existing caches
 
-+ Video feeds are not currently written to disk, so there is no local storage.
-  This is a feature that we are aiming to implement ASAP.
-
-+ There is currently no authentication required for viewing a stream - whoever
-  has the link can view it.
